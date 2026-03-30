@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s ifconfig.me)",
+      "Bash(curl -s -4 ifconfig.me)",
+      "Bash(curl -s https://api.ipify.org)",
+      "Bash(pulumi preview:*)",
+      "Bash(aws sts:*)"
+    ]
+  }
+}
