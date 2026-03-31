@@ -30,16 +30,28 @@ ec2_role = iam.Role("ggame-ec2-role",
     tags={"Name": "ggame-ec2-role"},
 )
 
-# Policy: allow read from artifacts bucket
-s3_policy = iam.RolePolicy("ggame-ec2-s3-policy",
+# Policy: S3 read (artifacts) + Route53 (certbot DNS validation)
+ec2_policy = iam.RolePolicy("ggame-ec2-policy",
     role=ec2_role.id,
     policy=artifacts_bucket.arn.apply(lambda arn: f"""{{
         "Version": "2012-10-17",
-        "Statement": [{{
-            "Effect": "Allow",
-            "Action": ["s3:GetObject", "s3:ListBucket"],
-            "Resource": ["{arn}", "{arn}/*"]
-        }}]
+        "Statement": [
+            {{
+                "Effect": "Allow",
+                "Action": ["s3:GetObject", "s3:ListBucket"],
+                "Resource": ["{arn}", "{arn}/*"]
+            }},
+            {{
+                "Effect": "Allow",
+                "Action": ["route53:ListHostedZones", "route53:GetChange"],
+                "Resource": "*"
+            }},
+            {{
+                "Effect": "Allow",
+                "Action": "route53:ChangeResourceRecordSets",
+                "Resource": "arn:aws:route53:::hostedzone/Z05670062ZTWRSY6PDM7V"
+            }}
+        ]
     }}"""),
 )
 
@@ -63,18 +75,21 @@ chown ec2-user:ec2-user /var/www/darkpath
 cat > /etc/nginx/conf.d/darkpath.conf << 'CONF'
 server {{
     listen 80;
-    server_name _;
+    server_name ggame.nphunter.net;
     root /var/www/darkpath;
     index index.html;
 
-    # Required MIME type for WebAssembly
+    include /etc/nginx/mime.types;
     types {{
         application/wasm wasm;
     }}
 
-    # Gzip for faster loading
+    # Required headers for Godot web export (secure context)
+    add_header Cross-Origin-Opener-Policy same-origin;
+    add_header Cross-Origin-Embedder-Policy require-corp;
+
     gzip on;
-    gzip_types application/javascript application/wasm application/octet-stream;
+    gzip_types text/html application/javascript application/wasm application/octet-stream;
 
     location / {{
         try_files $uri $uri/ =404;
@@ -82,12 +97,51 @@ server {{
 }}
 CONF
 
-# Move default nginx listener off port 80 to avoid conflict
+# Move default nginx listener off port 80 to avoid conflict (IPv4 + IPv6)
 sed -i 's/listen       80/listen       8080/' /etc/nginx/nginx.conf
+sed -i 's/listen       \[::\]:80/listen       [::]:8080/' /etc/nginx/nginx.conf
 
 # Start and enable nginx
 systemctl enable nginx
 systemctl start nginx
+
+# Install certbot with Route53 DNS plugin for HTTPS (no inbound port 80 needed)
+dnf install -y certbot python3-certbot-nginx python3-certbot-dns-route53 || pip3 install certbot-dns-route53
+certbot certonly --dns-route53 -d ggame.nphunter.net --non-interactive --agree-tos --email slzhao@outlook.com || true
+
+# Configure nginx to use the cert if it was issued
+if [ -f /etc/letsencrypt/live/ggame.nphunter.net/fullchain.pem ]; then
+    cat > /etc/nginx/conf.d/darkpath-ssl.conf << 'SSLCONF'
+server {{
+    listen 443 ssl;
+    server_name ggame.nphunter.net;
+    root /var/www/darkpath;
+    index index.html;
+
+    ssl_certificate /etc/letsencrypt/live/ggame.nphunter.net/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ggame.nphunter.net/privkey.pem;
+
+    include /etc/nginx/mime.types;
+    types {{
+        application/wasm wasm;
+    }}
+
+    add_header Cross-Origin-Opener-Policy same-origin;
+    add_header Cross-Origin-Embedder-Policy require-corp;
+
+    gzip on;
+    gzip_types text/html application/javascript application/wasm application/octet-stream;
+
+    location / {{
+        try_files $uri $uri/ =404;
+    }}
+}}
+SSLCONF
+    nginx -t && systemctl reload nginx
+fi
+
+systemctl enable certbot-renew.timer
+systemctl start certbot-renew.timer
 
 # Create deploy script that syncs latest artifact from S3
 cat > /usr/local/bin/deploy-darkpath.sh << 'DEPLOY'
