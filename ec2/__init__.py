@@ -62,11 +62,17 @@ instance = ec2.Instance("ggame-ec2",
     ami=ami.id,
     subnet_id=public_subnet.id,
     vpc_security_group_ids=[sg.id],
-    associate_public_ip_address=True,
+    associate_public_ip_address=False,
     key_name="slzhao-personal-mac",
     user_data=user_data_script,
     tags={"Name": "ggame-ec2"},
 )
 
+eip = ec2.Eip("ggame-eip",
+    instance=instance.id,
+    domain="vpc",
+    tags={"Name": "ggame-eip"},
+)
+
 pulumi.export("instance_id", instance.id)
-pulumi.export("instance_public_ip", instance.public_ip)
+pulumi.export("instance_public_ip", eip.public_ip)
