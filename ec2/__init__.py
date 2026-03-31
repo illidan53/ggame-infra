@@ -59,25 +59,25 @@ chown ec2-user:ec2-user /var/www/darkpath
 
 # Configure nginx to serve the game
 cat > /etc/nginx/conf.d/darkpath.conf << 'CONF'
-server {
+server {{
     listen 80;
     server_name _;
     root /var/www/darkpath;
     index index.html;
 
     # Required MIME type for WebAssembly
-    types {
+    types {{
         application/wasm wasm;
-    }
+    }}
 
     # Gzip for faster loading
     gzip on;
     gzip_types application/javascript application/wasm application/octet-stream;
 
-    location / {
+    location / {{
         try_files $uri $uri/ =404;
-    }
-}
+    }}
+}}
 CONF
 
 # Move default nginx listener off port 80 to avoid conflict
