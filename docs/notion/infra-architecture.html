@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GGame Infra Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f0f1a;
+    color: #e0e0e0;
+    padding: 40px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: #888;
+    margin-bottom: 48px;
+  }
+
+  .diagram { max-width: 1100px; margin: 0 auto; }
+
+  .top-row {
+    display: flex;
+    justify-content: center;
+    gap: 60px;
+    margin-bottom: 20px;
+  }
+
+  .card {
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    padding: 20px 28px;
+    text-align: center;
+    min-width: 160px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #5a5aff; }
+  .card .icon { font-size: 32px; margin-bottom: 8px; }
+  .card .name { font-size: 15px; font-weight: 600; color: #fff; }
+  .card .desc { font-size: 12px; color: #888; margin-top: 4px; }
+
+  .arrows-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 20px 0;
+  }
+  .arrow-down {
+    width: 2px;
+    height: 30px;
+    background: linear-gradient(to bottom, #5a5aff, #ff6b6b);
+  }
+  .arrow-down::after {
+    content: '';
+    display: block;
+    margin-left: -4px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #ff6b6b;
+  }
+  .arrow-label {
+    font-size: 11px;
+    color: #aaa;
+    padding: 4px 12px;
+    background: #1a1a2e;
+    border-radius: 4px;
+    border: 1px solid #2a2a4a;
+    margin: 6px 0;
+  }
+
+  .github-section {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+  }
+  .card.github {
+    min-width: 500px;
+    background: linear-gradient(135deg, #1a1a2e, #1e2a3a);
+    border-color: #3a5a8a;
+  }
+  .github-inner {
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    margin-top: 12px;
+  }
+  .github-sub {
+    background: #0d1b2a;
+    border-radius: 8px;
+    padding: 12px 20px;
+    text-align: center;
+  }
+  .github-sub .sub-name { font-size: 13px; color: #7eb8ff; font-weight: 600; }
+  .github-sub .sub-desc { font-size: 11px; color: #668; margin-top: 2px; }
+
+  .flow-row {
+    display: flex;
+    justify-content: center;
+    gap: 120px;
+    margin: 20px 0;
+  }
+  .flow-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .cloud-section {
+    display: flex;
+    justify-content: center;
+    gap: 60px;
+    margin-top: 20px;
+  }
+
+  .card.aws {
+    min-width: 500px;
+    background: linear-gradient(135deg, #1a1a2e, #2a1e1e);
+    border-color: #8a5a3a;
+  }
+  .aws-resources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 12px;
+  }
+  .aws-res {
+    background: #1a0d0a;
+    border: 1px solid #4a2a1a;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #ffaa66;
+  }
+
+  .card.pulumi-cloud {
+    background: linear-gradient(135deg, #1a1a2e, #2a1e2e);
+    border-color: #8a3a8a;
+    min-width: 180px;
+  }
+
+  .legend {
+    max-width: 1100px;
+    margin: 48px auto 0;
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #888;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .dot-dev { background: #5a5aff; }
+  .dot-ci { background: #3a8aff; }
+  .dot-aws { background: #ff8844; }
+  .dot-state { background: #aa44cc; }
+  .dot-auth { background: #44cc88; }
+
+  .rel-section {
+    max-width: 1100px;
+    margin: 48px auto 0;
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    padding: 28px 32px;
+  }
+  .rel-section h2 {
+    font-size: 18px;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+  .rel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .rel-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    background: #0d0d1a;
+    border-radius: 8px;
+  }
+  .rel-num {
+    background: #5a5aff;
+    color: #fff;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .rel-text { font-size: 13px; line-height: 1.5; }
+  .rel-text strong { color: #fff; }
+  .rel-text span { color: #aaa; }
+
+  .flow-diagram {
+    max-width: 1100px;
+    margin: 48px auto 0;
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    padding: 28px 32px;
+  }
+  .flow-diagram h2 {
+    font-size: 18px;
+    color: #fff;
+    margin-bottom: 20px;
+  }
+  .flow-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+  .flow-step {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .flow-step.dev { background: #1a1a3e; color: #aaaaff; border: 1px solid #3a3a6a; }
+  .flow-step.git { background: #1a2a3e; color: #7eb8ff; border: 1px solid #3a5a8a; }
+  .flow-step.ci { background: #1a2e3e; color: #44ccaa; border: 1px solid #2a5a4a; }
+  .flow-step.aws-step { background: #2a1e1e; color: #ffaa66; border: 1px solid #5a3a2a; }
+  .flow-connector {
+    color: #555;
+    font-size: 18px;
+    padding: 0 4px;
+  }
+</style>
+</head>
+<body>
+
+<h1>GGame Infra Architecture</h1>
+<p class="subtitle">End-to-end automated deployment with Pulumi + GitHub Actions + AWS OIDC</p>
+
+<div class="diagram">
+
+  <!-- Top: Developer tools -->
+  <div class="top-row">
+    <div class="card">
+      <div class="icon">💻</div>
+      <div class="name">Local Dev</div>
+      <div class="desc">Pulumi Python code<br>AWS SSO auth</div>
+    </div>
+    <div class="card">
+      <div class="icon">🤖</div>
+      <div class="name">Claude Code</div>
+      <div class="desc">AI-assisted IaC authoring<br>Deployment troubleshooting</div>
+    </div>
+  </div>
+
+  <!-- Arrow -->
+  <div class="arrows-section">
+    <div class="arrow-down"></div>
+    <div class="arrow-label">git push / Pull Request</div>
+    <div class="arrow-down"></div>
+  </div>
+
+  <!-- GitHub -->
+  <div class="github-section">
+    <div class="card github">
+      <div class="icon">🐙</div>
+      <div class="name">GitHub</div>
+      <div class="desc">Code repository + CI/CD platform</div>
+      <div class="github-inner">
+        <div class="github-sub">
+          <div class="sub-name">Repository</div>
+          <div class="sub-desc">ggame-infra</div>
+        </div>
+        <div class="github-sub">
+          <div class="sub-name">Actions (PR)</div>
+          <div class="sub-desc">pulumi preview</div>
+        </div>
+        <div class="github-sub">
+          <div class="sub-name">Actions (Merge)</div>
+          <div class="sub-desc">pulumi up</div>
+        </div>
+        <div class="github-sub">
+          <div class="sub-name">Secrets</div>
+          <div class="sub-desc">Role ARN / Token</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrows to cloud -->
+  <div class="flow-row">
+    <div class="flow-arrow">
+      <div class="arrow-label">OIDC temporary credentials</div>
+      <div class="arrow-down"></div>
+    </div>
+    <div class="flow-arrow">
+      <div class="arrow-label">State storage</div>
+      <div class="arrow-down"></div>
+    </div>
+  </div>
+
+  <!-- Bottom: AWS + Pulumi Cloud -->
+  <div class="cloud-section">
+    <div class="card aws">
+      <div class="icon">☁️</div>
+      <div class="name">AWS</div>
+      <div class="desc">Cloud resource platform</div>
+      <div class="aws-resources">
+        <div class="aws-res">VPC 172.16.0.0/26</div>
+        <div class="aws-res">Public Subnet</div>
+        <div class="aws-res">Internet Gateway</div>
+        <div class="aws-res">Route Table</div>
+        <div class="aws-res">Security Group</div>
+        <div class="aws-res">EC2 t3.medium</div>
+        <div class="aws-res">IAM OIDC Provider</div>
+        <div class="aws-res">IAM Role</div>
+        <div class="aws-res">SSO / Identity Center</div>
+      </div>
+    </div>
+    <div class="card pulumi-cloud">
+      <div class="icon">🟣</div>
+      <div class="name">Pulumi Cloud</div>
+      <div class="desc">State management<br>Deploy history<br>Resource tracking</div>
+    </div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot dot-dev"></div>Local Dev</div>
+  <div class="legend-item"><div class="legend-dot dot-ci"></div>CI/CD</div>
+  <div class="legend-item"><div class="legend-dot dot-aws"></div>AWS Resources</div>
+  <div class="legend-item"><div class="legend-dot dot-state"></div>State Management</div>
+  <div class="legend-item"><div class="legend-dot dot-auth"></div>Auth Chain</div>
+</div>
+
+<!-- Relationships -->
+<div class="rel-section">
+  <h2>Platform Relationships</h2>
+  <div class="rel-grid">
+    <div class="rel-item">
+      <div class="rel-num">1</div>
+      <div class="rel-text">
+        <strong>GitHub Actions → AWS (OIDC)</strong><br>
+        <span>GitHub Actions exchanges an OIDC identity token with AWS STS for temporary credentials. No long-lived Access Keys stored anywhere. AWS validates the request via the IAM Role trust policy.</span>
+      </div>
+    </div>
+    <div class="rel-item">
+      <div class="rel-num">2</div>
+      <div class="rel-text">
+        <strong>GitHub Actions → Pulumi Cloud</strong><br>
+        <span>Authenticated via PULUMI_ACCESS_TOKEN. Pulumi Cloud stores the state file (current resource state), preventing duplicate resource creation across deployments.</span>
+      </div>
+    </div>
+    <div class="rel-item">
+      <div class="rel-num">3</div>
+      <div class="rel-text">
+        <strong>Local Dev → AWS (SSO)</strong><br>
+        <span>Developer logs in via IAM Identity Center through a browser flow, receiving temporary credentials. Used for local pulumi preview during development. Credentials auto-expire.</span>
+      </div>
+    </div>
+    <div class="rel-item">
+      <div class="rel-num">4</div>
+      <div class="rel-text">
+        <strong>Pulumi → AWS</strong><br>
+        <span>Pulumi CLI uses the obtained AWS credentials (OIDC or SSO) to call AWS APIs and create/update/delete resources. Infrastructure defined as code, executed as API calls.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Flow -->
+<div class="flow-diagram">
+  <h2>Daily Workflow</h2>
+  <div class="flow-steps">
+    <div class="flow-step dev">Write Pulumi code</div>
+    <div class="flow-connector">→</div>
+    <div class="flow-step dev">Local preview</div>
+    <div class="flow-connector">→</div>
+    <div class="flow-step git">Push branch</div>
+    <div class="flow-connector">→</div>
+    <div class="flow-step git">Create PR</div>
+    <div class="flow-connector">→</div>
+    <div class="flow-step ci">Auto preview</div>
+    <div class="flow-connector">→</div>
+    <div class="flow-step git">Review & Merge</div>
+    <div class="flow-connector">→</div>
+    <div class="flow-step ci">Auto pulumi up</div>
+    <div class="flow-connector">→</div>
+    <div class="flow-step aws-step">Deployed to AWS</div>
+  </div>
+</div>
+
+</body>
+</html>

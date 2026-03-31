@@ -5,7 +5,17 @@
       "Bash(curl -s -4 ifconfig.me)",
       "Bash(curl -s https://api.ipify.org)",
       "Bash(pulumi preview:*)",
-      "Bash(aws sts:*)"
+      "Bash(aws sts:*)",
+      "Bash(gh repo:*)",
+      "Bash(brew install:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh run:*)",
+      "Bash(gh secret:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git branch:*)",
+      "Bash(git fetch:*)"
     ]
   }
 }

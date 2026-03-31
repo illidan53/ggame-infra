@@ -16,6 +16,47 @@ ami = ec2.get_ami(
     ],
 )
 
+user_data_script = """#!/bin/bash
+set -e
+
+# Install nginx
+dnf install -y nginx
+
+# Create web directory for DarkPath game
+mkdir -p /var/www/darkpath
+chown ec2-user:ec2-user /var/www/darkpath
+
+# Configure nginx to serve the game
+cat > /etc/nginx/conf.d/darkpath.conf << 'CONF'
+server {
+    listen 80;
+    server_name _;
+    root /var/www/darkpath;
+    index index.html;
+
+    # Required MIME type for WebAssembly
+    types {
+        application/wasm wasm;
+    }
+
+    # Gzip for faster loading
+    gzip on;
+    gzip_types application/javascript application/wasm application/octet-stream;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+CONF
+
+# Move default nginx listener off port 80 to avoid conflict
+sed -i 's/listen       80/listen       8080/' /etc/nginx/nginx.conf
+
+# Start and enable nginx
+systemctl enable nginx
+systemctl start nginx
+"""
+
 instance = ec2.Instance("ggame-ec2",
     instance_type="t3.medium",  # 2 vCPU, 4 GB RAM
     ami=ami.id,
@@ -23,6 +64,7 @@ instance = ec2.Instance("ggame-ec2",
     vpc_security_group_ids=[sg.id],
     associate_public_ip_address=True,
     key_name="slzhao-personal-mac",
+    user_data=user_data_script,
     tags={"Name": "ggame-ec2"},
 )
 
