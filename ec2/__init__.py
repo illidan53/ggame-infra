@@ -50,8 +50,10 @@ instance_profile = iam.InstanceProfile("ggame-ec2-profile",
 user_data_script = artifacts_bucket.id.apply(lambda bucket_name: f"""#!/bin/bash
 set -e
 
-# Install nginx
-dnf install -y nginx
+# Install nginx and cron
+dnf install -y nginx cronie
+systemctl enable crond
+systemctl start crond
 
 # Create web directory for DarkPath game
 mkdir -p /var/www/darkpath
