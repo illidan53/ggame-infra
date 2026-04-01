@@ -193,6 +193,7 @@ systemctl start certbot-renew.timer
 # Create deploy script that syncs latest artifact from S3
 cat > /usr/local/bin/deploy-darkpath.sh << 'DEPLOY'
 #!/bin/bash
+export PATH=/usr/local/bin:/usr/bin:/bin:$PATH
 BUCKET="{bucket_name}"
 LATEST=$(aws s3 ls "s3://$BUCKET/web/" --recursive | sort | tail -1 | awk '{{print $4}}')
 if [ -z "$LATEST" ]; then
