@@ -60,9 +60,14 @@ instance_profile = iam.InstanceProfile("ggame-ec2-profile",
 )
 
 user_data_script = artifacts_bucket.id.apply(lambda bucket_name: f"""#!/bin/bash
-set -e
+set -euo pipefail
+
+# Log all user_data output to a dedicated file (+ cloud-init-output.log)
+exec > >(tee -a /var/log/user-data.log) 2>&1
+echo "=== user_data started at $(date) ==="
 
 # Install nginx and cron
+echo "[INFO] Installing nginx and cronie..."
 dnf install -y nginx cronie
 systemctl enable crond
 systemctl start crond
@@ -99,7 +104,7 @@ cat > /var/www/nphunter/index.html << 'HOMEPAGE'
 </html>
 HOMEPAGE
 
-# Configure nginx to serve the game
+echo "[INFO] Configuring nginx..."
 cat > /etc/nginx/conf.d/darkpath.conf << 'CONF'
 server {{
     listen 80;
@@ -130,15 +135,24 @@ sed -i 's/listen       80/listen       8080/' /etc/nginx/nginx.conf
 sed -i 's/listen       \[::\]:80/listen       [::]:8080/' /etc/nginx/nginx.conf
 
 # Start and enable nginx
+echo "[INFO] Starting nginx..."
 systemctl enable nginx
 systemctl start nginx
+echo "[INFO] nginx started."
 
 # Install certbot with Route53 DNS plugin for HTTPS
+echo "[INFO] Installing certbot..."
 dnf install -y certbot python3-certbot-nginx python3-certbot-dns-route53 || pip3 install certbot-dns-route53
-certbot certonly --dns-route53 -d ggame.nphunter.net -d nphunter.net --non-interactive --agree-tos --email slzhao@outlook.com || true
+echo "[INFO] Requesting Let's Encrypt certificate via DNS validation..."
+if certbot certonly --dns-route53 -d ggame.nphunter.net -d nphunter.net --non-interactive --agree-tos --email slzhao@outlook.com; then
+    echo "[INFO] Certificate issued successfully."
+else
+    echo "[ERROR] Certbot failed. HTTPS will not be available."
+fi
 
 # Configure HTTPS nginx blocks if cert was issued
 if [ -f /etc/letsencrypt/live/ggame.nphunter.net/fullchain.pem ]; then
+    echo "[INFO] Configuring HTTPS nginx blocks..."
     cat > /etc/nginx/conf.d/darkpath-ssl.conf << 'SSLCONF'
 server {{
     listen 443 ssl;
@@ -185,38 +199,49 @@ server {{
 ROOTSSL
 
     nginx -t && systemctl reload nginx
+    echo "[INFO] HTTPS configured."
+else
+    echo "[WARN] No certificate found. HTTPS not configured."
 fi
 
 systemctl enable certbot-renew.timer
 systemctl start certbot-renew.timer
+echo "[INFO] Certbot auto-renewal timer enabled."
 
 # Create deploy script that syncs latest artifact from S3
+echo "[INFO] Setting up S3 deploy cron..."
 cat > /usr/local/bin/deploy-darkpath.sh << 'DEPLOY'
 #!/bin/bash
+set -euo pipefail
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH
+
+log() {{ echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"; }}
+
 BUCKET="{bucket_name}"
 LATEST=$(aws s3 ls "s3://$BUCKET/web/" --recursive | sort | tail -1 | awk '{{print $4}}')
 if [ -z "$LATEST" ]; then
-    echo "No artifacts found in s3://$BUCKET/web/"
+    log "No artifacts found in s3://$BUCKET/web/"
     exit 0
 fi
 MARKER="/var/www/darkpath/.deployed_artifact"
 if [ -f "$MARKER" ] && [ "$(cat $MARKER)" = "$LATEST" ]; then
     exit 0  # Already deployed
 fi
-echo "Deploying $LATEST..."
+log "Deploying $LATEST..."
 aws s3 cp "s3://$BUCKET/$LATEST" /tmp/darkpath-web.zip
 rm -rf /var/www/darkpath/*
 unzip -o /tmp/darkpath-web.zip -d /var/www/darkpath/
 rm /tmp/darkpath-web.zip
 echo "$LATEST" > "$MARKER"
-echo "Deployed $LATEST at $(date)"
+log "Deployed $LATEST successfully."
 DEPLOY
 chmod +x /usr/local/bin/deploy-darkpath.sh
 
 # Run every minute via cron
 echo "* * * * * ec2-user /usr/local/bin/deploy-darkpath.sh >> /var/log/darkpath-deploy.log 2>&1" > /etc/cron.d/darkpath-deploy
 chmod 644 /etc/cron.d/darkpath-deploy
+
+echo "=== user_data completed successfully at $(date) ==="
 """)  # end of .apply()
 
 instance = ec2.Instance("ggame-ec2",
