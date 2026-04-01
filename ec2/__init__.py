@@ -67,9 +67,37 @@ dnf install -y nginx cronie
 systemctl enable crond
 systemctl start crond
 
-# Create web directory for DarkPath game
+# Create web directories
 mkdir -p /var/www/darkpath
-chown ec2-user:ec2-user /var/www/darkpath
+mkdir -p /var/www/nphunter
+chown ec2-user:ec2-user /var/www/darkpath /var/www/nphunter
+
+# Create nphunter.net home page
+cat > /var/www/nphunter/index.html << 'HOMEPAGE'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nphunter.net</title>
+    <style>
+        body {{ background: #0a0a0f; color: #e0e0e0; font-family: monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }}
+        .container {{ text-align: center; max-width: 600px; padding: 2rem; }}
+        h1 {{ color: #cc3333; font-size: 2.5rem; letter-spacing: 0.3rem; }}
+        p {{ color: #888; line-height: 1.8; }}
+        a {{ color: #cc3333; text-decoration: none; border: 1px solid #cc3333; padding: 0.5rem 1.5rem; display: inline-block; margin-top: 1rem; }}
+        a:hover {{ background: #cc3333; color: #0a0a0f; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>nphunter.net</h1>
+        <p>Welcome. This is a personal project hub.</p>
+        <a href="https://ggame.nphunter.net">Play DarkPath</a>
+    </div>
+</body>
+</html>
+HOMEPAGE
 
 # Configure nginx to serve the game
 cat > /etc/nginx/conf.d/darkpath.conf << 'CONF'
@@ -105,11 +133,11 @@ sed -i 's/listen       \[::\]:80/listen       [::]:8080/' /etc/nginx/nginx.conf
 systemctl enable nginx
 systemctl start nginx
 
-# Install certbot with Route53 DNS plugin for HTTPS (no inbound port 80 needed)
+# Install certbot with Route53 DNS plugin for HTTPS
 dnf install -y certbot python3-certbot-nginx python3-certbot-dns-route53 || pip3 install certbot-dns-route53
-certbot certonly --dns-route53 -d ggame.nphunter.net --non-interactive --agree-tos --email slzhao@outlook.com || true
+certbot certonly --dns-route53 -d ggame.nphunter.net -d nphunter.net --non-interactive --agree-tos --email slzhao@outlook.com || true
 
-# Configure nginx to use the cert if it was issued
+# Configure HTTPS nginx blocks if cert was issued
 if [ -f /etc/letsencrypt/live/ggame.nphunter.net/fullchain.pem ]; then
     cat > /etc/nginx/conf.d/darkpath-ssl.conf << 'SSLCONF'
 server {{
@@ -137,6 +165,25 @@ server {{
     }}
 }}
 SSLCONF
+
+    cat > /etc/nginx/conf.d/nphunter-ssl.conf << 'ROOTSSL'
+server {{
+    listen 443 ssl;
+    server_name nphunter.net;
+    root /var/www/nphunter;
+    index index.html;
+
+    ssl_certificate /etc/letsencrypt/live/ggame.nphunter.net/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ggame.nphunter.net/privkey.pem;
+}}
+
+server {{
+    listen 80;
+    server_name nphunter.net;
+    return 301 https://$host$request_uri;
+}}
+ROOTSSL
+
     nginx -t && systemctl reload nginx
 fi
 

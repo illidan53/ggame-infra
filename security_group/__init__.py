@@ -25,26 +25,26 @@ ec2.SecurityGroupRule("ggame-sg-ssh",
     description="SSH from my IP",
 )
 
-# Allow HTTP (80) from my IP
+# Allow HTTP (80) from internet
 ec2.SecurityGroupRule("ggame-sg-http",
     type="ingress",
     security_group_id=sg.id,
     protocol="tcp",
     from_port=80,
     to_port=80,
-    cidr_blocks=[f"{my_ip}/32"],
-    description="HTTP from my IP",
+    cidr_blocks=["0.0.0.0/0"],
+    description="HTTP from internet",
 )
 
-# Allow HTTPS (443) from my IP
+# Allow HTTPS (443) from internet
 ec2.SecurityGroupRule("ggame-sg-https",
     type="ingress",
     security_group_id=sg.id,
     protocol="tcp",
     from_port=443,
     to_port=443,
-    cidr_blocks=[f"{my_ip}/32"],
-    description="HTTPS from my IP",
+    cidr_blocks=["0.0.0.0/0"],
+    description="HTTPS from internet",
 )
 
 # Allow all outbound

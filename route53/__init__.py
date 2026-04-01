@@ -17,5 +17,13 @@ ggame_record = route53.Record("ggame-record",
     ttl=300,
     records=[eip.public_ip])
 
+root_record = route53.Record("root-record",
+    zone_id=zone.zone_id,
+    name="nphunter.net",
+    type="A",
+    ttl=300,
+    records=[eip.public_ip])
+
 pulumi.export("zone_id", zone.zone_id)
 pulumi.export("ggame_domain", ggame_record.fqdn)
+pulumi.export("root_domain", root_record.fqdn)
