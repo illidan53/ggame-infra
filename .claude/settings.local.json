@@ -6,7 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'git push'; then echo 'Waiting for GitHub Actions run to complete...'; sleep 5; RUN_ID=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId'); gh run watch \"$RUN_ID\" --exit-status 2>&1 || { echo 'GITHUB ACTIONS RUN FAILED. Please check the logs with: gh run view '\"$RUN_ID\"' --log-failed'; exit 1; }; echo 'GitHub Actions run succeeded.'; fi"
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'git push'; then echo 'Waiting for GitHub Actions run to complete...'; sleep 5; RUN_ID=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId'); gh run watch \"$RUN_ID\" --exit-status 2>&1 || { echo 'GITHUB ACTIONS RUN FAILED. Please check the logs with: gh run view '\"$RUN_ID\"' --log-failed'; exit 1; }; echo 'GitHub Actions run succeeded.'; echo 'Smoke testing endpoints...'; sleep 5; for URL in https://ggame.nphunter.net/ https://nphunter.net/; do STATUS=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 10 \"$URL\"); echo \"$URL -> HTTP $STATUS\"; if [ \"$STATUS\" != '200' ]; then echo \"SMOKE TEST FAILED\"; exit 1; fi; done; echo 'All endpoints OK.'; fi",
+            "timeout": 600,
+            "statusMessage": "Watching GitHub Actions run..."
           }
         ]
       }
