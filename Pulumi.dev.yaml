@@ -1,3 +1,4 @@
 config:
   aws:region: us-east-1
   ggame-infra:my_ip: "71.104.70.191"
+  ggame-infra:certbot_email: "slzhao@outlook.com"

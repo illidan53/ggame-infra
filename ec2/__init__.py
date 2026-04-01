@@ -5,6 +5,9 @@ from pulumi_aws import ec2, iam
 
 from vpc import public_subnet
 from security_group import sg
+
+config = pulumi.Config()
+certbot_email = config.require("certbot_email")
 from s3 import bucket as artifacts_bucket
 
 # Amazon Linux 2023 AMI lookup
@@ -142,7 +145,7 @@ echo "[INFO] nginx started."
 echo "[INFO] Installing certbot..."
 dnf install -y certbot python3-certbot-nginx python3-certbot-dns-route53 || pip3 install certbot-dns-route53
 echo "[INFO] Requesting Let's Encrypt certificate via DNS validation..."
-if certbot certonly --dns-route53 -d ggame.nphunter.net -d nphunter.net --non-interactive --agree-tos --email slzhao@outlook.com; then
+if certbot certonly --dns-route53 -d ggame.nphunter.net -d nphunter.net --non-interactive --agree-tos --email {certbot_email}; then
     echo "[INFO] Certificate issued successfully."
 else
     echo "[ERROR] Certbot failed. HTTPS will not be available."
