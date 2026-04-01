@@ -66,11 +66,9 @@ set -euo pipefail
 exec > >(tee -a /var/log/user-data.log) 2>&1
 echo "=== user_data started at $(date) ==="
 
-# Install nginx and cron
-echo "[INFO] Installing nginx and cronie..."
-dnf install -y nginx cronie
-systemctl enable crond
-systemctl start crond
+# Install nginx
+echo "[INFO] Installing nginx..."
+dnf install -y nginx
 
 # Create web directories
 mkdir -p /var/www/darkpath
@@ -208,38 +206,61 @@ systemctl enable certbot-renew.timer
 systemctl start certbot-renew.timer
 echo "[INFO] Certbot auto-renewal timer enabled."
 
-# Create deploy script that syncs latest artifact from S3
-echo "[INFO] Setting up S3 deploy cron..."
+# Create deploy script with absolute paths
+echo "[INFO] Setting up S3 deploy..."
 cat > /usr/local/bin/deploy-darkpath.sh << 'DEPLOY'
 #!/bin/bash
-set -euo pipefail
-export PATH=/usr/local/bin:/usr/bin:/bin:$PATH
-
-log() {{ echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"; }}
-
 BUCKET="{bucket_name}"
-LATEST=$(aws s3 ls "s3://$BUCKET/web/" --recursive | sort | tail -1 | awk '{{print $4}}')
+MARKER="/var/www/darkpath/.deployed_artifact"
+
+LATEST=$(/usr/bin/aws s3 ls "s3://$BUCKET/web/" --recursive | /usr/bin/sort | /usr/bin/tail -1 | /usr/bin/awk '{{print $4}}')
 if [ -z "$LATEST" ]; then
-    log "No artifacts found in s3://$BUCKET/web/"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] No artifacts in s3://$BUCKET/web/"
     exit 0
 fi
-MARKER="/var/www/darkpath/.deployed_artifact"
 if [ -f "$MARKER" ] && [ "$(cat $MARKER)" = "$LATEST" ]; then
-    exit 0  # Already deployed
+    exit 0
 fi
-log "Deploying $LATEST..."
-aws s3 cp "s3://$BUCKET/$LATEST" /tmp/darkpath-web.zip
-rm -rf /var/www/darkpath/*
-unzip -o /tmp/darkpath-web.zip -d /var/www/darkpath/
-rm /tmp/darkpath-web.zip
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying $LATEST..."
+/usr/bin/aws s3 cp "s3://$BUCKET/$LATEST" /tmp/darkpath-web.zip
+/usr/bin/rm -rf /var/www/darkpath/*
+/usr/bin/unzip -o /tmp/darkpath-web.zip -d /var/www/darkpath/
+/usr/bin/rm -f /tmp/darkpath-web.zip
 echo "$LATEST" > "$MARKER"
-log "Deployed $LATEST successfully."
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deployed $LATEST successfully."
 DEPLOY
 chmod +x /usr/local/bin/deploy-darkpath.sh
 
-# Run every minute via cron
-echo "* * * * * ec2-user /usr/local/bin/deploy-darkpath.sh >> /var/log/darkpath-deploy.log 2>&1" > /etc/cron.d/darkpath-deploy
-chmod 644 /etc/cron.d/darkpath-deploy
+# Use systemd timer instead of cron (more reliable on Amazon Linux 2023)
+echo "[INFO] Setting up systemd deploy timer..."
+cat > /etc/systemd/system/darkpath-deploy.service << 'SVC'
+[Unit]
+Description=Deploy DarkPath from S3
+
+[Service]
+Type=oneshot
+User=ec2-user
+ExecStart=/usr/local/bin/deploy-darkpath.sh
+StandardOutput=append:/var/log/darkpath-deploy.log
+StandardError=append:/var/log/darkpath-deploy.log
+SVC
+
+cat > /etc/systemd/system/darkpath-deploy.timer << 'TMR'
+[Unit]
+Description=Run DarkPath deploy every minute
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=60
+
+[Install]
+WantedBy=timers.target
+TMR
+
+systemctl daemon-reload
+systemctl enable darkpath-deploy.timer
+systemctl start darkpath-deploy.timer
+echo "[INFO] Deploy timer started."
 
 echo "=== user_data completed successfully at $(date) ==="
 """)  # end of .apply()
